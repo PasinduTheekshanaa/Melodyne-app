@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
-import 'package:file_picker/file_picker.dart';
+import 'package:file_picker/file_picker.dart'; // <-- Import File Picker
+import 'dart:io';
 import 'package:permission_handler/permission_handler.dart';
-import 'sound_effects_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,13 +14,11 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool isPlaying = false;
-  bool isRepeating = false;
   Duration duration = Duration.zero;
   Duration position = Duration.zero;
-  double _currentPlaybackSpeed = 1.0;
 
-  String? currentFilePath;
-  String? currentFileName;
+  String? currentFilePath; // to store selected song path
+  String? currentFileName; // song name
 
   final String defaultUrl =
       'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
@@ -38,14 +36,11 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     _audioPlayer.onPlayerComplete.listen((event) {
-      if (!isRepeating) {
-        setState(() {
-          isPlaying = false;
-          position = Duration.zero;
-        });
-      }
+      setState(() {
+        isPlaying = false;
+        position = Duration.zero;
+      });
     });
-    _audioPlayer.setPlaybackRate(_currentPlaybackSpeed);
   }
 
   void playAudio({String? path}) async {
@@ -56,7 +51,6 @@ class _HomeScreenState extends State<HomeScreen> {
       await _audioPlayer.play(UrlSource(defaultUrl));
     }
     setState(() => isPlaying = true);
-    await _audioPlayer.setPlaybackRate(_currentPlaybackSpeed);
   }
 
   void pauseAudio() async {
@@ -92,7 +86,7 @@ class _HomeScreenState extends State<HomeScreen> {
         playAudio(path: path);
       }
     } else {
-      openAppSettings();
+      openAppSettings(); // open settings if denied
     }
   }
 
@@ -126,166 +120,80 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                // Top Row for the Sound Effects Button
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.graphic_eq, color: Colors.white),
-                      onPressed: () async {
-                        if (currentFilePath == null) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                "Please select a song first!",
-                                style: TextStyle(color: Colors.black87),
-                              ),
-                              backgroundColor: Colors.transparent,
-                            ),
-                          );
-                          return;
-                        }
-
-                        final effect = await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => SoundEffectsScreen(
-                              currentFilePath: currentFilePath!,
-                            ),
-                          ),
-                        );
-
-                        if (effect != null && effect is Map<String, dynamic>) {
-                          final newSpeed = effect["speed"] as double;
-                          setState(() {
-                            _currentPlaybackSpeed = newSpeed;
-                          });
-
-                          await _audioPlayer.setPlaybackRate(newSpeed);
-
-                          // Resume playback if it was paused
-                          if (!isPlaying) {
-                            playAudio(path: currentFilePath);
-                          }
-                        }
-                      },
-                    ),
-                  ],
-                ),
-
-                // Music Icon container
-                Expanded(
-                  child: Center(
-                    child: Container(
-                      height: 280,
-                      width: 280,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(30),
-                        color: Colors.deepPurple.shade200,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black26,
-                            blurRadius: 20,
-                            offset: Offset(0, 10),
-                          ),
-                        ],
+                // Album Art
+                Container(
+                  height: 280,
+                  width: 280,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 20,
+                        offset: Offset(0, 10),
                       ),
-                      child: Icon(
-                        Icons.music_note,
-                        size: 120,
-                        color: Colors.white,
-                      ),
+                    ],
+                    image: DecorationImage(
+                      image: AssetImage("assets/music_placeholder.png"),
+                      fit: BoxFit.cover,
                     ),
                   ),
                 ),
 
                 // Song Info
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        currentFileName ?? "SoundHelix Song",
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      SizedBox(height: 6),
-                      Text(
-                        currentFilePath != null
-                            ? "From Storage"
-                            : "Artist Name",
-                        style: TextStyle(fontSize: 16, color: Colors.white70),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Progress bar
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Slider(
-                        min: 0,
-                        max: duration.inSeconds.toDouble(),
-                        value: position.inSeconds.toDouble().clamp(
-                          0,
-                          duration.inSeconds.toDouble(),
-                        ),
-                        onChanged: (value) async {
-                          final newPosition = Duration(seconds: value.toInt());
-                          await _audioPlayer.seek(newPosition);
-                        },
-                        activeColor: Colors.white,
-                        inactiveColor: Colors.white38,
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            formatTime(position),
-                            style: TextStyle(color: Colors.white70),
-                          ),
-                          Text(
-                            formatTime(duration - position),
-                            style: TextStyle(color: Colors.white70),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Playback Speed Slider
                 Column(
                   children: [
                     Text(
-                      'Playback Speed: ${_currentPlaybackSpeed.toStringAsFixed(1)}x',
-                      style: TextStyle(fontSize: 16, color: Colors.white),
+                      currentFileName ?? "SoundHelix Song",
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
-                    Slider(
-                      min: 0.5,
-                      max: 2.0,
-                      divisions: 3,
-                      value: _currentPlaybackSpeed,
-                      onChanged: (value) async {
-                        setState(() {
-                          _currentPlaybackSpeed = value;
-                        });
-                        await _audioPlayer.setPlaybackRate(value);
-                      },
-                      activeColor: Colors.amber,
-                      inactiveColor: Colors.amber.shade200,
-                      label: '${_currentPlaybackSpeed.toStringAsFixed(1)}x',
+                    SizedBox(height: 6),
+                    Text(
+                      currentFilePath != null ? "From Storage" : "Artist Name",
+                      style: TextStyle(fontSize: 16, color: Colors.white70),
                     ),
                   ],
                 ),
 
-                // Controls
+                // Progress bar
+                Column(
+                  children: [
+                    Slider(
+                      min: 0,
+                      max: duration.inSeconds.toDouble(),
+                      value: position.inSeconds.toDouble().clamp(
+                        0,
+                        duration.inSeconds.toDouble(),
+                      ),
+                      onChanged: (value) async {
+                        final newPosition = Duration(seconds: value.toInt());
+                        await _audioPlayer.seek(newPosition);
+                      },
+                      activeColor: Colors.white,
+                      inactiveColor: Colors.white38,
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          formatTime(position),
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                        Text(
+                          formatTime(duration - position),
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+
+                // Controls + Playlist
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -295,7 +203,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         color: Colors.white,
                         size: 32,
                       ),
-                      onPressed: pickAudioFile,
+                      onPressed: pickAudioFile, // <-- Open storage
                     ),
                     SizedBox(width: 20),
                     IconButton(
@@ -326,11 +234,9 @@ class _HomeScreenState extends State<HomeScreen> {
                           color: Colors.deepPurple,
                         ),
                         onPressed: () {
-                          if (isPlaying) {
-                            pauseAudio();
-                          } else {
-                            playAudio(path: currentFilePath);
-                          }
+                          isPlaying
+                              ? pauseAudio()
+                              : playAudio(path: currentFilePath);
                         },
                       ),
                     ),
@@ -345,19 +251,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     SizedBox(width: 20),
                     IconButton(
-                      icon: Icon(
-                        Icons.repeat,
-                        color: isRepeating ? Colors.white : Colors.white70,
-                        size: 28,
-                      ),
-                      onPressed: () async {
-                        setState(() {
-                          isRepeating = !isRepeating;
-                        });
-                        await _audioPlayer.setReleaseMode(
-                          isRepeating ? ReleaseMode.loop : ReleaseMode.stop,
-                        );
-                      },
+                      icon: Icon(Icons.repeat, color: Colors.white70, size: 28),
+                      onPressed: () {},
                     ),
                   ],
                 ),
